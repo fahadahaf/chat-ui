@@ -1,0 +1,17 @@
+# Sample RAG YAML with Gremlin queries
+- name: agent hierarchy
+  description: Get agent hierarchy for a given agent id
+  parameters:
+    - name: agent_id
+      type: string
+- name: count agents in team
+  description: Count number of agents in a team by team_id
+  parameters:
+    - name: team_id
+      type: string
+- name: agent details
+  description: Get details of a given agent id
+  parameters:
+    - name: agent_id
+      type: string
+

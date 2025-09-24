@@ -18,6 +18,10 @@ const useAIChatStreamHandler = () => {
   const [teamId] = useQueryState('team')
   const [sessionId, setSessionId] = useQueryState('session')
   const selectedEndpoint = useStore((state) => state.selectedEndpoint)
+  const backend = useStore((state) => state.backend)
+  const ollamaUrl = useStore((state) => state.ollamaUrl)
+  const ollamaModel = useStore((state) => state.ollamaModel)
+  const ragUrl = useStore((state) => state.ragUrl)
   const mode = useStore((state) => state.mode)
   const setStreamingErrorMessage = useStore(
     (state) => state.setStreamingErrorMessage
@@ -25,6 +29,9 @@ const useAIChatStreamHandler = () => {
   const setIsStreaming = useStore((state) => state.setIsStreaming)
   const setSessionsData = useStore((state) => state.setSessionsData)
   const { streamResponse } = useAIResponseStream()
+  const ollamaSessions = useStore((s) => s.ollamaSessions)
+  const setOllamaSessions = useStore((s) => s.setOllamaSessions)
+  const setOllamaSessionMessages = useStore((s) => s.setOllamaSessionMessages)
 
   const updateMessagesWithErrorState = useCallback(() => {
     setMessages((prevMessages) => {
@@ -122,9 +129,11 @@ const useAIChatStreamHandler = () => {
         return prevMessages
       })
 
+      const userText = (formData.get('message') as string) || ''
+
       addMessage({
         role: 'user',
-        content: formData.get('message') as string,
+        content: userText,
         created_at: Math.floor(Date.now() / 1000)
       })
 
@@ -136,36 +145,168 @@ const useAIChatStreamHandler = () => {
         created_at: Math.floor(Date.now() / 1000) + 1
       })
 
+      // Ensure an Ollama session exists and has a name
+      let effectiveSessionId = sessionId ?? ''
+      if (backend === 'ollama') {
+        if (!effectiveSessionId) {
+          effectiveSessionId = `${Date.now()}`
+          setSessionId(effectiveSessionId)
+        }
+        const userPrompt = formData.get('message') as string
+        const title = userPrompt?.slice(0, 40) || 'New Chat'
+        const exists = ollamaSessions.some((s) => s.session_id === effectiveSessionId)
+        if (!exists) {
+          setOllamaSessions((prev) => [
+            { session_id: effectiveSessionId, session_name: title, created_at: Math.floor(Date.now() / 1000) },
+            ...prev,
+          ])
+        } else {
+          setOllamaSessions((prev) => prev.map((s) => s.session_id === effectiveSessionId && (s.session_name === 'New Chat' || !s.session_name) ? { ...s, session_name: title } : s))
+        }
+        // Initialize session messages immediately
+        const currentMessages = useStore.getState().messages
+        setOllamaSessionMessages((prev) => ({
+          ...prev,
+          [effectiveSessionId]: currentMessages
+        }))
+      }
+
       let lastContent = ''
       let newSessionId = sessionId
       try {
-        const endpointUrl = constructEndpointUrl(selectedEndpoint)
+        if (backend === 'ollama' || backend === 'amazon') {
+          // Ensure server-side chat session exists for current user
+          if (!newSessionId) {
+            try {
+              const createRes = await fetch('/api/chats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ provider: backend })
+              })
+              if (createRes.ok) {
+                const created = await createRes.json()
+                newSessionId = created.id
+                setSessionId(created.id)
+                try {
+                  window.dispatchEvent(new CustomEvent('sessions:changed', { detail: created }))
+                } catch {}
+              }
+            } catch {}
+          }
 
-        let RunUrl: string | null = null
+          // Persist user message
+          if (newSessionId) {
+            try {
+              await fetch(`/api/chats/${newSessionId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ role: 'user', content: userText })
+              })
+            } catch {}
+          }
 
-        if (mode === 'team' && teamId) {
-          RunUrl = APIRoutes.TeamRun(endpointUrl, teamId)
-        } else if (mode === 'agent' && agentId) {
-          RunUrl = APIRoutes.AgentRun(endpointUrl).replace(
-            '{agent_id}',
-            agentId
-          )
-        }
+          // RAG pipeline call: send to Python backend to build plan using RAG and chosen provider
+          const requestBody: Record<string, unknown> = {
+            text: userText,
+            history: (() => {
+              // Last two prior user queries (exclude current one)
+              const all = useStore.getState().messages
+              const priorUsers = all.filter((m) => m.role === 'user')
+              const withoutCurrent = priorUsers.slice(0, -1)
+              return withoutCurrent.slice(-2).map((m) => m.content)
+            })(),
+            provider: backend,
+            provider_config:
+              backend === 'ollama'
+                ? { base_url: ollamaUrl, model: ollamaModel || agentId || 'llama3' }
+                : { region: useStore.getState().amazonRegion, endpoint: useStore.getState().amazonEndpoint }
+          }
 
-        if (!RunUrl) {
-          updateMessagesWithErrorState()
-          setStreamingErrorMessage('Please select an agent or team first.')
-          setIsStreaming(false)
-          return
-        }
+          const res = await fetch(`/api/rag/plan?base=${encodeURIComponent(ragUrl)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(requestBody)
+          })
 
-        formData.append('stream', 'true')
-        formData.append('session_id', sessionId ?? '')
+          if (!res.ok) {
+            throw new Error(`RAG backend error: ${res.statusText}`)
+          }
+          const data = (await res.json()) as { plan?: unknown; raw?: string; table?: { title?: string; columns: string[]; rows: Array<Record<string, unknown>> } }
+          // Prefer backend-provided table; fallback to building from plan
+          let columns = ['step', 'name', 'parameters']
+          let rows: Array<Record<string, unknown>> = []
+          if (data.table && Array.isArray(data.table.columns) && Array.isArray(data.table.rows)) {
+            columns = data.table.columns
+            rows = data.table.rows.map((r) => ({ ...r, parameters: r.parameters ? JSON.stringify(r.parameters) : r.parameters }))
+          } else {
+            const plan = Array.isArray(data.plan) ? data.plan : []
+            for (const step of plan as any[]) {
+              rows.push({
+                step: (step && step.step) ?? '',
+                name: (step && step.name) ?? '',
+                parameters: (step && step.parameters) ? JSON.stringify(step.parameters) : ''
+              })
+            }
+          }
+          setMessages((prev) => {
+            const newMessages = [...prev]
+            const lastMessage = newMessages[newMessages.length - 1]
+            if (lastMessage && lastMessage.role === 'agent') {
+              lastMessage.content = ''
+              lastMessage.extra_data = {
+                ...lastMessage.extra_data,
+                table: {
+                  title: (data as any)?.table?.title || 'Execution Plan',
+                  columns,
+                  rows
+                }
+              }
+            }
+            return newMessages
+          })
 
-        await streamResponse({
-          apiUrl: RunUrl,
-          requestBody: formData,
-          onChunk: (chunk: RunResponse) => {
+          // Persist agent response with table
+          if (newSessionId) {
+            try {
+              await fetch(`/api/chats/${newSessionId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ role: 'agent', content: '', extra_data: { table: { title: (data as any)?.table?.title || 'Execution Plan', columns, rows } } })
+              })
+            } catch {}
+          }
+        } else {
+          const endpointUrl = constructEndpointUrl(selectedEndpoint)
+
+          let RunUrl: string | null = null
+
+          if (mode === 'team' && teamId) {
+            RunUrl = APIRoutes.TeamRun(endpointUrl, teamId)
+          } else if (mode === 'agent' && agentId) {
+            RunUrl = APIRoutes.AgentRun(endpointUrl).replace(
+              '{agent_id}',
+              agentId
+            )
+          }
+
+          if (!RunUrl) {
+            updateMessagesWithErrorState()
+            setStreamingErrorMessage('Please select an agent or team first.')
+            setIsStreaming(false)
+            return
+          }
+
+          formData.append('stream', 'true')
+          formData.append('session_id', sessionId ?? '')
+
+          await streamResponse({
+            apiUrl: RunUrl,
+            requestBody: formData,
+            onChunk: (chunk: RunResponse) => {
             if (
               chunk.event === RunEvent.RunStarted ||
               chunk.event === RunEvent.TeamRunStarted ||
@@ -386,21 +527,22 @@ const useAIChatStreamHandler = () => {
                 return newMessages
               })
             }
-          },
-          onError: (error) => {
-            updateMessagesWithErrorState()
-            setStreamingErrorMessage(error.message)
-            if (newSessionId) {
-              setSessionsData(
-                (prevSessionsData) =>
-                  prevSessionsData?.filter(
-                    (session) => session.session_id !== newSessionId
-                  ) ?? null
-              )
-            }
-          },
-          onComplete: () => {}
-        })
+            },
+            onError: (error) => {
+              updateMessagesWithErrorState()
+              setStreamingErrorMessage(error.message)
+              if (newSessionId) {
+                setSessionsData(
+                  (prevSessionsData) =>
+                    prevSessionsData?.filter(
+                      (session) => session.session_id !== newSessionId
+                    ) ?? null
+                )
+              }
+            },
+            onComplete: () => {}
+          })
+        }
       } catch (error) {
         updateMessagesWithErrorState()
         setStreamingErrorMessage(
@@ -424,6 +566,10 @@ const useAIChatStreamHandler = () => {
       addMessage,
       updateMessagesWithErrorState,
       selectedEndpoint,
+      backend,
+      ollamaUrl,
+      ollamaModel,
+      ragUrl,
       streamResponse,
       agentId,
       teamId,
@@ -434,7 +580,10 @@ const useAIChatStreamHandler = () => {
       setSessionsData,
       sessionId,
       setSessionId,
-      processChunkToolCalls
+      processChunkToolCalls,
+      ollamaSessions,
+      setOllamaSessions,
+      setOllamaSessionMessages
     ]
   )
 

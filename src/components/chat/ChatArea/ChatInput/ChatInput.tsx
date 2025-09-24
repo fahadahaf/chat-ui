@@ -10,6 +10,8 @@ import Icon from '@/components/ui/icon'
 
 const ChatInput = () => {
   const { chatInputRef } = useStore()
+  const backend = useStore((state) => state.backend)
+  const ollamaModel = useStore((state) => state.ollamaModel)
 
   const { handleStreamResponse } = useAIChatStreamHandler()
   const [selectedAgent] = useQueryState('agent')
@@ -51,13 +53,15 @@ const ChatInput = () => {
           }
         }}
         className="w-full border border-accent bg-primaryAccent px-4 text-sm text-primary focus:border-accent"
-        disabled={!(selectedAgent || teamId)}
+        disabled={backend === 'agentos' ? !(selectedAgent || teamId) : !ollamaModel}
         ref={chatInputRef}
       />
       <Button
         onClick={handleSubmit}
         disabled={
-          !(selectedAgent || teamId) || !inputMessage.trim() || isStreaming
+          (backend === 'agentos'
+            ? !(selectedAgent || teamId)
+            : !ollamaModel) || !inputMessage.trim() || isStreaming
         }
         size="icon"
         className="rounded-xl bg-primary p-5 text-primaryAccent"

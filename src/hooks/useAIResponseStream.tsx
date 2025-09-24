@@ -127,12 +127,20 @@ function parseBuffer(
       try {
         const parsed = JSON.parse(jsonString)
 
-        // Check if it's in the legacy format - use as is
+        // 1) Legacy AgentOS event format
         if (isLegacyFormat(parsed)) {
           processChunk(parsed, onChunk)
+        } else if (
+          // 2) Passthrough for providers like Ollama: plain JSON per line
+          parsed &&
+          typeof parsed === 'object' &&
+          (Object.prototype.hasOwnProperty.call(parsed, 'message') ||
+            Object.prototype.hasOwnProperty.call(parsed, 'done'))
+        ) {
+          processChunk(parsed as RunResponseContent, onChunk)
         } else {
-          // New format - convert to legacy format for compatibility
-          const legacyChunk = convertNewFormatToLegacy(parsed)
+          // 3) New event/data format → convert to legacy
+          const legacyChunk = convertNewFormatToLegacy(parsed as NewFormatData)
           processChunk(legacyChunk, onChunk)
         }
       } catch {

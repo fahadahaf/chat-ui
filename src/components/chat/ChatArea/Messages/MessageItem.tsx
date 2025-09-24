@@ -5,8 +5,9 @@ import type { ChatMessage } from '@/types/os'
 import Videos from './Multimedia/Videos'
 import Images from './Multimedia/Images'
 import Audios from './Multimedia/Audios'
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import AgentThinkingLoader from './AgentThinkingLoader'
+import { DataTable } from '@/components/ui/typography/MarkdownRenderer'
 
 interface MessageProps {
   message: ChatMessage
@@ -14,6 +15,7 @@ interface MessageProps {
 
 const AgentMessage = ({ message }: MessageProps) => {
   const { streamingErrorMessage } = useStore()
+  const [showReasoning, setShowReasoning] = useState(false)
   let messageContent
   if (message.streamingError) {
     messageContent = (
@@ -26,9 +28,34 @@ const AgentMessage = ({ message }: MessageProps) => {
         )}
       </p>
     )
-  } else if (message.content) {
+  } else if (message.content || message.extra_data?.table) {
     messageContent = (
       <div className="flex w-full flex-col gap-4">
+        {message.extra_data?.table && (
+          <div className="rounded-md border border-primary/15 bg-background-secondary p-3">
+            {message.extra_data.table.title && (
+              <p className="mb-2 text-xs uppercase text-primary">{message.extra_data.table.title}</p>
+            )}
+            <DataTable columns={message.extra_data.table.columns} rows={message.extra_data.table.rows} />
+          </div>
+        )}
+        {message.extra_data?.reasoning_text && (
+          <div className="rounded-md border border-primary/15 bg-background-secondary p-3">
+            <button
+              className="text-xs uppercase text-primary"
+              onClick={() => setShowReasoning((s) => !s)}
+            >
+              {showReasoning ? 'Hide reasoning' : 'Show reasoning'}
+            </button>
+            {showReasoning && (
+              <div className="mt-2 text-sm text-secondary">
+                <MarkdownRenderer>
+                  {message.extra_data.reasoning_text}
+                </MarkdownRenderer>
+              </div>
+            )}
+          </div>
+        )}
         <MarkdownRenderer>{message.content}</MarkdownRenderer>
         {message.videos && message.videos.length > 0 && (
           <Videos videos={message.videos} />

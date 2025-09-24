@@ -5,11 +5,15 @@ import { useStore } from '../store'
 
 import { AgentDetails, TeamDetails, type ChatMessage } from '@/types/os'
 import { getAgentsAPI, getStatusAPI, getTeamsAPI } from '@/api/os'
+import { getOllamaModels, getOllamaStatus } from '@/api/ollama'
 import { useQueryState } from 'nuqs'
 
 const useChatActions = () => {
   const { chatInputRef } = useStore()
   const selectedEndpoint = useStore((state) => state.selectedEndpoint)
+  const backend = useStore((state) => state.backend)
+  const ollamaUrl = useStore((state) => state.ollamaUrl)
+  const setOllamaModel = useStore((state) => state.setOllamaModel)
   const [, setSessionId] = useQueryState('session')
   const setMessages = useStore((state) => state.setMessages)
   const setIsEndpointActive = useStore((state) => state.setIsEndpointActive)
@@ -24,32 +28,50 @@ const useChatActions = () => {
 
   const getStatus = useCallback(async () => {
     try {
-      const status = await getStatusAPI(selectedEndpoint)
-      return status
+      if (backend === 'ollama') {
+        return await getOllamaStatus(ollamaUrl)
+      } else {
+        return await getStatusAPI(selectedEndpoint)
+      }
     } catch {
       return 503
     }
-  }, [selectedEndpoint])
+  }, [selectedEndpoint, backend, ollamaUrl])
 
   const getAgents = useCallback(async () => {
     try {
-      const agents = await getAgentsAPI(selectedEndpoint)
-      return agents
+      if (backend === 'ollama') {
+        // For Ollama, synthesize "agents" from available models
+        const models = await getOllamaModels(ollamaUrl)
+        return models.map((m) => ({
+          id: m.name,
+          name: m.name,
+          model: { name: m.name, model: m.name, provider: 'ollama' }
+        }))
+      } else {
+        const agents = await getAgentsAPI(selectedEndpoint)
+        return agents
+      }
     } catch {
       toast.error('Error fetching agents')
       return []
     }
-  }, [selectedEndpoint])
+  }, [selectedEndpoint, backend, ollamaUrl])
 
   const getTeams = useCallback(async () => {
     try {
-      const teams = await getTeamsAPI(selectedEndpoint)
-      return teams
+      if (backend === 'ollama') {
+        // No teams concept for Ollama
+        return []
+      } else {
+        const teams = await getTeamsAPI(selectedEndpoint)
+        return teams
+      }
     } catch {
       toast.error('Error fetching teams')
       return []
     }
-  }, [selectedEndpoint])
+  }, [selectedEndpoint, backend])
 
   const clearChat = useCallback(() => {
     setMessages([])
@@ -99,6 +121,7 @@ const useChatActions = () => {
             setMode('agent')
             setAgentId(firstAgent.id)
             setSelectedModel(firstAgent.model?.model || '')
+            if (backend === 'ollama') setOllamaModel(firstAgent.model?.model || '')
             setDbId(firstAgent.db_id || '')
             setAgents(agents)
           }
@@ -110,6 +133,7 @@ const useChatActions = () => {
             if (agent) {
               setMode('agent')
               setSelectedModel(agent.model?.model || '')
+              if (backend === 'ollama') setOllamaModel(agent.model?.model || '')
               setDbId(agent.db_id || '')
               setTeamId(null)
             } else if (agents.length > 0) {
@@ -117,6 +141,7 @@ const useChatActions = () => {
               setMode('agent')
               setAgentId(firstAgent.id)
               setSelectedModel(firstAgent.model?.model || '')
+              if (backend === 'ollama') setOllamaModel(firstAgent.model?.model || '')
               setDbId(firstAgent.db_id || '')
               setTeamId(null)
             }
@@ -171,7 +196,9 @@ const useChatActions = () => {
     setTeamId,
     setDbId,
     agentId,
-    teamId
+    teamId,
+    backend,
+    setOllamaModel
   ])
 
   return {

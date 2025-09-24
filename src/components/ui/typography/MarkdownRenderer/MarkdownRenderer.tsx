@@ -17,7 +17,7 @@ const MarkdownRenderer: FC<MarkdownRendererProps> = ({
 }) => (
   <ReactMarkdown
     className={cn(
-      'prose prose-h1:text-xl dark:prose-invert flex w-full flex-col gap-y-5 rounded-lg',
+      'prose prose-h1:text-base prose-h2:text-base prose-h3:text-base prose-h4:text-base prose-headings:font-semibold dark:prose-invert flex w-full flex-col gap-y-5 rounded-lg',
       classname
     )}
     components={{ ...(inline ? inlineComponents : components) }}

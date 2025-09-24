@@ -175,11 +175,13 @@ export interface AgentExtraData {
   reasoning_steps?: ReasoningSteps[]
   reasoning_messages?: ReasoningMessage[]
   references?: ReferenceData[]
+  reasoning_text?: string
 }
 
 export interface AgentExtraData {
   reasoning_messages?: ReasoningMessage[]
   references?: ReferenceData[]
+  reasoning_text?: string
 }
 
 export interface ReasoningMessage {
@@ -204,6 +206,12 @@ export interface ChatMessage {
     reasoning_steps?: ReasoningSteps[]
     reasoning_messages?: ReasoningMessage[]
     references?: ReferenceData[]
+    reasoning_text?: string
+    table?: {
+      columns: string[]
+      rows: Array<Record<string, unknown>>
+      title?: string
+    }
   }
   images?: ImageData[]
   videos?: VideoData[]

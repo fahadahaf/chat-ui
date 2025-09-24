@@ -13,6 +13,9 @@ interface Store {
   setHydrated: () => void
   streamingErrorMessage: string
   setStreamingErrorMessage: (streamingErrorMessage: string) => void
+  // Backend selection
+  backend: 'ollama' | 'amazon'
+  setBackend: (backend: 'ollama' | 'amazon') => void
   endpoints: {
     endpoint: string
     id__endpoint: string
@@ -36,6 +39,19 @@ interface Store {
   chatInputRef: React.RefObject<HTMLTextAreaElement | null>
   selectedEndpoint: string
   setSelectedEndpoint: (selectedEndpoint: string) => void
+  // Ollama settings
+  ollamaUrl: string
+  setOllamaUrl: (url: string) => void
+  ollamaModel: string
+  setOllamaModel: (model: string) => void
+  // Amazon settings
+  amazonRegion: string
+  setAmazonRegion: (region: string) => void
+  amazonEndpoint: string
+  setAmazonEndpoint: (endpoint: string) => void
+  // RAG settings
+  ragUrl: string
+  setRagUrl: (url: string) => void
   agents: AgentDetails[]
   setAgents: (agents: AgentDetails[]) => void
   teams: TeamDetails[]
@@ -52,6 +68,37 @@ interface Store {
   ) => void
   isSessionsLoading: boolean
   setIsSessionsLoading: (isSessionsLoading: boolean) => void
+  // User role (temporary until auth integration)
+  userRole: 'admin' | 'user'
+  setUserRole: (role: 'admin' | 'user') => void
+  authUserId?: string
+  setAuthUserId: (id?: string) => void
+  // Ollama local sessions
+  ollamaSessions: SessionEntry[]
+  setOllamaSessions: (
+    sessions:
+      | SessionEntry[]
+      | ((prev: SessionEntry[]) => SessionEntry[])
+  ) => void
+  ollamaSessionMessages: Record<string, ChatMessage[]>
+  setOllamaSessionMessages: (
+    updater:
+      | Record<string, ChatMessage[]>
+      | ((prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>)
+  ) => void
+  // Amazon local sessions
+  amazonSessions: SessionEntry[]
+  setAmazonSessions: (
+    sessions:
+      | SessionEntry[]
+      | ((prev: SessionEntry[]) => SessionEntry[])
+  ) => void
+  amazonSessionMessages: Record<string, ChatMessage[]>
+  setAmazonSessionMessages: (
+    updater:
+      | Record<string, ChatMessage[]>
+      | ((prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>)
+  ) => void
 }
 
 export const useStore = create<Store>()(
@@ -62,6 +109,8 @@ export const useStore = create<Store>()(
       streamingErrorMessage: '',
       setStreamingErrorMessage: (streamingErrorMessage) =>
         set(() => ({ streamingErrorMessage })),
+      backend: 'ollama',
+      setBackend: (backend) => set(() => ({ backend })),
       endpoints: [],
       setEndpoints: (endpoints) => set(() => ({ endpoints })),
       isStreaming: false,
@@ -82,6 +131,16 @@ export const useStore = create<Store>()(
       selectedEndpoint: 'http://localhost:7777',
       setSelectedEndpoint: (selectedEndpoint) =>
         set(() => ({ selectedEndpoint })),
+      ollamaUrl: 'http://localhost:11434',
+      setOllamaUrl: (url) => set(() => ({ ollamaUrl: url })),
+      ollamaModel: '',
+      setOllamaModel: (model) => set(() => ({ ollamaModel: model })),
+      amazonRegion: '',
+      setAmazonRegion: (region) => set(() => ({ amazonRegion: region })),
+      amazonEndpoint: '',
+      setAmazonEndpoint: (endpoint) => set(() => ({ amazonEndpoint: endpoint })),
+      ragUrl: 'http://localhost:8000',
+      setRagUrl: (url) => set(() => ({ ragUrl: url })),
       agents: [],
       setAgents: (agents) => set({ agents }),
       teams: [],
@@ -100,13 +159,56 @@ export const useStore = create<Store>()(
         })),
       isSessionsLoading: false,
       setIsSessionsLoading: (isSessionsLoading) =>
-        set(() => ({ isSessionsLoading }))
+        set(() => ({ isSessionsLoading })),
+      userRole: 'user',
+      setUserRole: (role) => set(() => ({ userRole: role })),
+      authUserId: undefined,
+      setAuthUserId: (id) => set(() => ({ authUserId: id })),
+      ollamaSessions: [],
+      setOllamaSessions: (sessions) =>
+        set((state) => ({
+          ollamaSessions:
+            typeof sessions === 'function' ? sessions(state.ollamaSessions) : sessions
+        })),
+      ollamaSessionMessages: {},
+      setOllamaSessionMessages: (updater) =>
+        set((state) => ({
+          ollamaSessionMessages:
+            typeof updater === 'function'
+              ? (updater as (prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>) (
+                  state.ollamaSessionMessages
+                )
+              : updater
+        })),
+      amazonSessions: [],
+      setAmazonSessions: (sessions) =>
+        set((state) => ({
+          amazonSessions:
+            typeof sessions === 'function' ? sessions(state.amazonSessions) : sessions
+        })),
+      amazonSessionMessages: {},
+      setAmazonSessionMessages: (updater) =>
+        set((state) => ({
+          amazonSessionMessages:
+            typeof updater === 'function'
+              ? (updater as (prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>) (
+                  state.amazonSessionMessages
+                )
+              : updater
+        }))
     }),
     {
       name: 'endpoint-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        selectedEndpoint: state.selectedEndpoint
+        selectedEndpoint: state.selectedEndpoint,
+        backend: state.backend,
+        ollamaUrl: state.ollamaUrl,
+        ollamaModel: state.ollamaModel,
+        amazonRegion: state.amazonRegion,
+        amazonEndpoint: state.amazonEndpoint,
+        // Do not persist per-user sessions/messages to avoid leakage across users
+        ragUrl: state.ragUrl
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated?.()
