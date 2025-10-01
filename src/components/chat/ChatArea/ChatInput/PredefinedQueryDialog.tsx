@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 interface QueryParameter {
   name: string
   type: string
+  options?: string[]
 }
 
 interface QueryDefinition {
@@ -70,7 +71,12 @@ const PredefinedQueryDialog = ({
     // Initialize parameter values
     const initialValues: Record<string, string> = {}
     query.parameters?.forEach((param) => {
-      initialValues[param.name] = ''
+      // For select types, default to first option if available
+      if (param.type === 'select' && param.options && param.options.length > 0) {
+        initialValues[param.name] = param.options[0]
+      } else {
+        initialValues[param.name] = ''
+      }
     })
     setParameterValues(initialValues)
   }
@@ -110,6 +116,63 @@ const PredefinedQueryDialog = ({
     setParameterValues({})
   }
 
+  const renderParameterInput = (param: QueryParameter) => {
+    const value = parameterValues[param.name] || ''
+
+    // Render select dropdown if options are provided
+    if (param.type === 'select' && param.options && param.options.length > 0) {
+      return (
+        <select
+          value={value}
+          onChange={(e) => handleParameterChange(param.name, e.target.value)}
+          className="w-full rounded-lg border border-accent bg-primaryAccent px-3 py-2 text-sm text-primary focus:border-brand focus:outline-none"
+        >
+          {param.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      )
+    }
+
+    // Render date input for date type
+    if (param.type === 'date') {
+      return (
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => handleParameterChange(param.name, e.target.value)}
+          className="w-full rounded-lg border border-accent bg-primaryAccent px-3 py-2 text-sm text-primary focus:border-brand focus:outline-none"
+        />
+      )
+    }
+
+    // Render number input for number type
+    if (param.type === 'number') {
+      return (
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => handleParameterChange(param.name, e.target.value)}
+          className="w-full rounded-lg border border-accent bg-primaryAccent px-3 py-2 text-sm text-primary focus:border-brand focus:outline-none"
+          placeholder={`Enter ${param.name}`}
+        />
+      )
+    }
+
+    // Default: render text input
+    return (
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => handleParameterChange(param.name, e.target.value)}
+        className="w-full rounded-lg border border-accent bg-primaryAccent px-3 py-2 text-sm text-primary focus:border-brand focus:outline-none"
+        placeholder={`Enter ${param.name}`}
+      />
+    )
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-h-[500px] font-geist">
@@ -134,16 +197,10 @@ const PredefinedQueryDialog = ({
                 selectedQuery.parameters.map((param) => (
                   <div key={param.name} className="space-y-2">
                     <label className="text-sm font-medium text-primary">
-                      {param.name}
+                      {param.name.replace(/_/g, ' ')}
                       <span className="ml-1 text-xs text-secondary">({param.type})</span>
                     </label>
-                    <input
-                      type="text"
-                      value={parameterValues[param.name] || ''}
-                      onChange={(e) => handleParameterChange(param.name, e.target.value)}
-                      className="w-full rounded-lg border border-accent bg-primaryAccent px-3 py-2 text-sm text-primary focus:border-brand focus:outline-none"
-                      placeholder={`Enter ${param.name}`}
-                    />
+                    {renderParameterInput(param)}
                   </div>
                 ))
               ) : (

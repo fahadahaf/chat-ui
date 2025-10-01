@@ -23,4 +23,16 @@
       type: string
     - name: depth
       type: number
-
+- name: products sold by line of business
+  description: Get all products sold by a given line of business for a given period
+  parameters: 
+    - name: line_of_business
+      type: select
+      options:
+        - COSMETICS
+        - CLOTHING
+        - SPORTS
+    - name: period_start
+      type: date
+    - name: period_end
+      type: date
