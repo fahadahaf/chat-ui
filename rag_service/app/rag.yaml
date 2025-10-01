@@ -14,4 +14,13 @@
   parameters:
     - name: agent_id
       type: string
+- name: list all teams
+  description: List all teams in the system
+- name: agent connections
+  description: Get all connections for a specific agent
+  parameters:
+    - name: agent_id
+      type: string
+    - name: depth
+      type: number
 

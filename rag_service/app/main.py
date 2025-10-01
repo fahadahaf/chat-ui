@@ -121,6 +121,24 @@ async def health():
     return {"ok": True}
 
 
+@app.get("/queries")
+async def get_queries():
+    """Return all available queries from the RAG YAML"""
+    return {"queries": RAG_DATA}
+
+
+@app.post("/execute")
+async def execute(req: dict):
+    """Execute a predefined plan directly without LLM"""
+    plan = req.get("plan")
+    if not plan:
+        return {"error": "Missing plan"}
+    
+    # Execute using gremlin_execution
+    table = gremlin_execution(plan)
+    return {"table": table}
+
+
 def simple_retriever(text: str, k: int = 5) -> List[Dict[str, Any]]:
     if _has_chroma:
         try:
