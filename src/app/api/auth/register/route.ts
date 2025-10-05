@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { readDB, writeDB, uid, type Role } from '@/lib/server/db'
+import { readDB, writeDB, uid, type Role, type DBUser } from '@/lib/server/db'
 
 export const runtime = 'nodejs'
 
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     return new Response('Email already registered', { status: 409 })
   }
   const hash = await bcrypt.hash(password, 10)
-  const user = {
+  const user: DBUser = {
     id: uid('u_'),
     email,
     name,

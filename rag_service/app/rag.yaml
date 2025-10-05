@@ -1,23 +1,53 @@
 # Sample RAG YAML with Gremlin queries
 - name: agent hierarchy
   description: Get agent hierarchy for a given agent id
+  details: |
+    Retrieves the complete hierarchical structure for a specific agent, including parent and child relationships.
+    
+    Example: agent_id = "3945X"
+    Returns: All agents in the hierarchy tree with their roles and relationships.
+  file: /queries/agent_hierarchy.gremlin
   parameters:
     - name: agent_id
       type: string
 - name: count agents in team
   description: Count number of agents in a team by team_id
+  details: |
+    Counts the total number of agents associated with a specific team.
+    
+    Example: team_id = "TEAM001"
+    Returns: Integer count of all active agents in the team.
+  file: /queries/count_agents_in_team.gremlin
   parameters:
     - name: team_id
       type: string
 - name: agent details
   description: Get details of a given agent id
+  details: |
+    Fetches comprehensive information about an agent including name, role, contact info, and status.
+    
+    Example: agent_id = "AG12345"
+    Returns: Agent profile with all metadata fields.
+  file: /queries/agent_details.gremlin
   parameters:
     - name: agent_id
       type: string
 - name: list all teams
   description: List all teams in the system
+  details: |
+    Retrieves a complete list of all teams registered in the system.
+    
+    No parameters required.
+    Returns: Array of team objects with team_id, name, and description.
+  file: /queries/list_all_teams.gremlin
 - name: agent connections
   description: Get all connections for a specific agent
+  details: |
+    Finds all connected agents within a specified depth (number of hops) from the given agent.
+    
+    Example: agent_id = "AG001", depth = 2
+    Returns: All agents connected within 2 hops with connection types.
+  file: /queries/agent_connections.gremlin
   parameters:
     - name: agent_id
       type: string
@@ -25,6 +55,16 @@
       type: number
 - name: products sold by line of business
   description: Get all products sold by a given line of business for a given period
+  details: |
+    Retrieves product sales data filtered by line of business and date range.
+    
+    Example: 
+      line_of_business = "COSMETICS"
+      period_start = "2024-01-01"
+      period_end = "2024-12-31"
+    
+    Returns: List of products with sales figures, revenue, and units sold.
+  file: /queries/products_by_lob.gremlin
   parameters: 
     - name: line_of_business
       type: select

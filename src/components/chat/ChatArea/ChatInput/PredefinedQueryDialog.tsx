@@ -22,6 +22,8 @@ interface QueryParameter {
 interface QueryDefinition {
   name: string
   description: string
+  details?: string
+  file?: string
   parameters?: QueryParameter[]
 }
 
@@ -40,6 +42,7 @@ const PredefinedQueryDialog = ({
   const [selectedQuery, setSelectedQuery] = useState<QueryDefinition | null>(null)
   const [parameterValues, setParameterValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
   const ragUrl = useStore((state) => state.ragUrl)
 
   // Load queries from RAG service
@@ -108,12 +111,14 @@ const PredefinedQueryDialog = ({
   const handleClose = () => {
     setSelectedQuery(null)
     setParameterValues({})
+    setShowDetails(false)
     onClose()
   }
 
   const handleBack = () => {
     setSelectedQuery(null)
     setParameterValues({})
+    setShowDetails(false)
   }
 
   const renderParameterInput = (param: QueryParameter) => {
@@ -190,6 +195,16 @@ const PredefinedQueryDialog = ({
         <div className="scrollbar-none max-h-[300px] overflow-y-auto py-4">
           {loading ? (
             <div className="text-center text-sm text-secondary">Loading queries...</div>
+          ) : selectedQuery && showDetails ? (
+            // Details view
+            <div className="space-y-4">
+              <div className="rounded-lg border border-accent bg-primaryAccent p-4">
+                <h3 className="mb-2 text-sm font-semibold text-primary">Query Details</h3>
+                <div className="whitespace-pre-wrap text-sm text-secondary">
+                  {selectedQuery.details || 'No additional details available.'}
+                </div>
+              </div>
+            </div>
           ) : selectedQuery ? (
             // Parameter input form
             <div className="space-y-4">
@@ -239,22 +254,33 @@ const PredefinedQueryDialog = ({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex justify-between">
           {selectedQuery ? (
             <>
               <Button
                 variant="outline"
                 className="rounded-xl border-border font-geist"
-                onClick={handleBack}
+                onClick={() => setShowDetails(!showDetails)}
               >
-                BACK
+                {showDetails ? 'PARAMETERS' : 'DETAILS'}
               </Button>
-              <Button
-                className="rounded-xl bg-brand font-geist text-primary hover:bg-brand/80"
-                onClick={handleExecute}
-              >
-                EXECUTE
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl border-border font-geist"
+                  onClick={handleBack}
+                >
+                  BACK
+                </Button>
+                {!showDetails && (
+                  <Button
+                    className="rounded-xl bg-brand font-geist text-primary hover:bg-brand/80"
+                    onClick={handleExecute}
+                  >
+                    EXECUTE
+                  </Button>
+                )}
+              </div>
             </>
           ) : (
             <Button

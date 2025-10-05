@@ -6,7 +6,9 @@ const PUBLIC_PATHS = [
   '/api/auth/login',
   '/api/auth/register',
   '/_next',
-  '/favicon.ico'
+  '/favicon.ico',
+  '/logo.png',
+  '/logo.svg'
 ]
 
 export function middleware(req: NextRequest) {
