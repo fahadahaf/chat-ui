@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id
+  email        String   @unique
+  name         String?
+  passwordHash String   @map("password_hash")
+  role         String   // 'admin' or 'user'
+  createdAt    BigInt   @map("created_at") // Unix timestamp in milliseconds
+  chats        Chat[]
+
+  @@map("users")
+}
+
+model Chat {
+  id          String    @id
+  userId      String    @map("user_id")
+  provider    String    // 'ollama' or 'amazon'
+  sessionName String    @map("session_name")
+  createdAt   BigInt    @map("created_at") // Unix timestamp in milliseconds
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@index([userId])
+  @@map("chats")
+}
+
+model Message {
+  id            String  @id
+  chatSessionId String  @map("chat_session_id")
+  role          String  // 'user', 'agent', 'system', or 'tool'
+  content       String
+  extraData     String? @map("extra_data") // JSON string
+  createdAt     BigInt  @map("created_at") // Unix timestamp in milliseconds
+  chat          Chat    @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId])
+  @@map("messages")
+}

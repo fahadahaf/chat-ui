@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const PUBLIC_PATHS = [
   '/login',
-  '/register',
+  '/register', // Still public so users can see the "disabled" message
   '/api/auth/login',
-  '/api/auth/register',
+  // '/api/auth/register', // Disabled - no longer public
   '/_next',
   '/favicon.ico',
   '/logo.png',

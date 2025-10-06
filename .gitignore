@@ -32,7 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env.local
-.env
+# .env is needed for DATABASE_URL
 
 # vercel
 .vercel
@@ -58,3 +58,12 @@ build/
 venv/
 ENV/
 env/
+
+# Prisma
+/src/generated/prisma
+*.db
+*.db-journal
+# Note: prisma/migrations/ should be committed to git!
+
+# Old JSON database backups
+data/db-backup.json
