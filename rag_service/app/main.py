@@ -48,6 +48,130 @@ def load_rag(path: str) -> List[Dict[str, Any]]:
         return data if isinstance(data, list) else []
 
 
+def normalize_parameters(params: Any) -> List[Dict[str, Any]]:
+    """
+    Normalize parameters to a list format for internal processing.
+    Supports both old list format and new dict format.
+    
+    Old format: [{name: ..., type: ..., options: ...}]
+    New format: {param_name: {type: ..., required: ..., options: ...}}
+    """
+    if params is None:
+        return []
+    
+    # New dict format: {param_name: {type: ..., required: ..., options: ...}}
+    if isinstance(params, dict):
+        result = []
+        for param_name, param_config in params.items():
+            normalized = {
+                'name': param_name,
+                'type': param_config.get('type', 'string'),
+                'required': param_config.get('required', False)
+            }
+            if 'options' in param_config:
+                normalized['options'] = param_config['options']
+            result.append(normalized)
+        return result
+    
+    # Old list format: [{name: ..., type: ..., options: ...}]
+    if isinstance(params, list):
+        # Add 'required' field if missing (default to True for backward compatibility)
+        result = []
+        for param in params:
+            normalized = dict(param)
+            if 'required' not in normalized:
+                normalized['required'] = True
+            result.append(normalized)
+        return result
+    
+    return []
+
+
+def validate_parameters(query_def: Dict[str, Any], provided_params: Dict[str, Any]) -> tuple[bool, str]:
+    """
+    Validate that all required parameters are provided and have correct types.
+    Returns (is_valid, error_message)
+    """
+    params = normalize_parameters(query_def.get('parameters'))
+    
+    for param in params:
+        param_name = param['name']
+        param_type = param.get('type', 'string')
+        param_value = provided_params.get(param_name)
+        
+        # Check if required parameter is present
+        if param.get('required', False):
+            if param_name not in provided_params or not str(param_value).strip():
+                return False, f"Required parameter '{param_name}' is missing or empty"
+        
+        # If parameter is provided, validate its type
+        if param_name in provided_params and param_value is not None and str(param_value).strip():
+            # Skip validation for NOT_PROVIDED (will be caught by check_not_provided_params)
+            if str(param_value).strip().upper() == "NOT_PROVIDED":
+                continue
+                
+            # Validate based on type
+            if param_type == 'number':
+                try:
+                    float(param_value)
+                except (ValueError, TypeError):
+                    return False, f"Parameter '{param_name}' must be a number, got: {param_value}"
+            
+            elif param_type == 'date':
+                # Validate YYYY-MM-DD format
+                import re
+                if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(param_value)):
+                    return False, f"Parameter '{param_name}' must be in YYYY-MM-DD format, got: {param_value}"
+                # Additional validation: check if it's a valid date
+                try:
+                    from datetime import datetime
+                    datetime.strptime(str(param_value), '%Y-%m-%d')
+                except ValueError:
+                    return False, f"Parameter '{param_name}' is not a valid date: {param_value}"
+            
+            elif param_type == 'select':
+                # Validate that value is one of the allowed options
+                options = param.get('options', [])
+                if options and str(param_value) not in options:
+                    return False, f"Parameter '{param_name}' must be one of {options}, got: {param_value}"
+    
+    return True, ""
+
+
+def check_not_provided_params(plan: Any) -> tuple[bool, List[Dict[str, str]]]:
+    """
+    Check if any parameters in the plan have NOT_PROVIDED values.
+    Returns (has_not_provided, list of missing params with details)
+    """
+    missing_params = []
+    
+    if isinstance(plan, list):
+        for step in plan:
+            query_name = step.get("name")
+            provided_params = step.get("parameters", {})
+            
+            # Find the query definition to get parameter details
+            query_def = next((q for q in RAG_DATA if q.get("name") == query_name), None)
+            
+            for param_name, param_value in provided_params.items():
+                if str(param_value).strip().upper() == "NOT_PROVIDED":
+                    # Get parameter type for better error message
+                    param_type = "value"
+                    if query_def:
+                        params = normalize_parameters(query_def.get('parameters'))
+                        param_def = next((p for p in params if p['name'] == param_name), None)
+                        if param_def:
+                            param_type = param_def.get('type', 'value')
+                    
+                    missing_params.append({
+                        "query": query_name,
+                        "parameter": param_name,
+                        "type": param_type
+                    })
+    
+    return len(missing_params) > 0, missing_params
+
+
 RAG_PATH = os.environ.get("RAG_YAML", os.path.join(os.path.dirname(__file__), "rag.yaml"))
 RAG_DATA = load_rag(RAG_PATH)
 CHROMA_DIR = os.environ.get("RAG_CHROMA_DIR", os.path.join(os.path.dirname(__file__), "chroma"))
@@ -100,10 +224,16 @@ try:
         docs: List[str] = []
         metas: List[Dict[str, Any]] = []
         for i, item in enumerate(RAG_DATA):
-            text = f"name: {item.get('name','')}\n description: {item.get('description','')}\n parameters: {item.get('parameters', [])}"
+            # Normalize parameters for consistent representation
+            normalized_params = normalize_parameters(item.get('parameters'))
+            param_text = ', '.join([f"{p['name']}({p['type']}{'*' if p.get('required') else ''})" for p in normalized_params])
+            text = f"name: {item.get('name','')}\n description: {item.get('description','')}\n parameters: {param_text}"
             ids.append(f"q_{i}")
             docs.append(text)
-            metas.append(item)
+            # Store normalized parameters in metadata
+            item_copy = dict(item)
+            item_copy['parameters'] = normalized_params
+            metas.append(item_copy)
         if docs:
             embs = embedder.encode(docs).tolist()
             col.add(ids=ids, documents=docs, metadatas=metas, embeddings=embs)
@@ -124,7 +254,13 @@ async def health():
 @app.get("/queries")
 async def get_queries():
     """Return all available queries from the RAG YAML"""
-    return {"queries": RAG_DATA}
+    # Normalize all queries to use consistent parameter format
+    normalized_queries = []
+    for query in RAG_DATA:
+        query_copy = dict(query)
+        query_copy['parameters'] = normalize_parameters(query.get('parameters'))
+        normalized_queries.append(query_copy)
+    return {"queries": normalized_queries}
 
 
 @app.post("/execute")
@@ -133,6 +269,19 @@ async def execute(req: dict):
     plan = req.get("plan")
     if not plan:
         return {"error": "Missing plan"}
+    
+    # Validate parameters if plan is a list of steps
+    if isinstance(plan, list):
+        for step in plan:
+            query_name = step.get("name")
+            provided_params = step.get("parameters", {})
+            
+            # Find the query definition
+            query_def = next((q for q in RAG_DATA if q.get("name") == query_name), None)
+            if query_def:
+                is_valid, error_msg = validate_parameters(query_def, provided_params)
+                if not is_valid:
+                    return {"error": f"Validation error for '{query_name}': {error_msg}"}
     
     # Execute using gremlin_execution
     table = gremlin_execution(plan)
@@ -178,7 +327,14 @@ PROMPT_TEMPLATE = (
     "2. For parameters with 'type: select' and 'options', you MUST use one of the exact option values (case-sensitive)\n"
     "3. For parameters with 'type: date', convert to YYYY-MM-DD format (e.g., 'January 2025' → '2025-01-01', 'July 2025' → '2025-07-31')\n"
     "4. For date ranges, use the first day of start month and last day of end month\n"
-    "5. Match natural language to option values (e.g., 'cosmetics' → 'COSMETICS', 'clothing' → 'CLOTHING')\n\n"
+    "5. Match natural language to option values (e.g., 'cosmetics' → 'COSMETICS', 'clothing' → 'CLOTHING')\n"
+    "6. ALL parameters with 'required: true' MUST be included in your plan - do not skip them\n"
+    "7. Parameters with 'required: false' are optional and can be omitted if not mentioned by the user\n"
+    "8. CRITICAL: If a required parameter value is NOT clearly provided by the user, you MUST use the exact string \"NOT_PROVIDED\" as its value\n"
+    "9. NEVER make assumptions or guess parameter values - if unclear or missing, always use \"NOT_PROVIDED\"\n"
+    "10. Examples of missing info:\n"
+    "    - User says 'from January 2025' but doesn't specify end date → period_end: \"NOT_PROVIDED\"\n"
+    "    - User says 'get products' but doesn't specify line of business → line_of_business: \"NOT_PROVIDED\"\n\n"
     "Conversation context (most recent first):\n{history}\n\n"
     "User: {user}\n\nAvailable queries (YAML-like):\n{rag}\n\n"
     "Return only your plan as JSON:[ ... ] and nothing else."
@@ -289,6 +445,59 @@ async def plan(req: PlanRequest):
 
     plan = extract_json_plan(raw)
     print(plan)
+    
+    # Check for NOT_PROVIDED parameters
+    has_missing, missing_params = check_not_provided_params(plan)
+    if has_missing:
+        # Build a user-friendly error message
+        missing_list = []
+        for mp in missing_params:
+            param_display = mp['parameter'].replace('_', ' ')
+            missing_list.append(f"• {param_display} ({mp['type']})")
+        
+        error_message = (
+            "I need more information to complete this request. "
+            "Please provide the following:\n\n" + 
+            "\n".join(missing_list) + 
+            "\n\nPlease specify these values in your query."
+        )
+        
+        # Return error in plan format
+        return PlanResponse(
+            plan=[{
+                "step": 0,
+                "name": "missing_parameters",
+                "parameters": {},
+                "message": error_message,
+                "missing_params": missing_params
+            }],
+            raw=raw,
+            table=None
+        )
+    
+    # Validate parameter types for each step in the plan
+    if isinstance(plan, list):
+        for step in plan:
+            query_name = step.get("name")
+            provided_params = step.get("parameters", {})
+            
+            # Find the query definition
+            query_def = next((q for q in RAG_DATA if q.get("name") == query_name), None)
+            if query_def:
+                is_valid, error_msg = validate_parameters(query_def, provided_params)
+                if not is_valid:
+                    # Return type validation error
+                    return PlanResponse(
+                        plan=[{
+                            "step": 0,
+                            "name": "validation_error",
+                            "parameters": {},
+                            "message": f"Parameter validation failed: {error_msg}"
+                        }],
+                        raw=raw,
+                        table=None
+                    )
+    
     # Dummy execution returns a random table
     table = gremlin_execution(plan)
     return PlanResponse(plan=plan, raw=raw, table=table)

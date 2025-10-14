@@ -17,6 +17,7 @@ interface QueryParameter {
   name: string
   type: string
   options?: string[]
+  required?: boolean
 }
 
 interface QueryDefinition {
@@ -94,13 +95,14 @@ const PredefinedQueryDialog = ({
   const handleExecute = () => {
     if (!selectedQuery) return
 
-    // Validate that all parameters are filled
-    const allFilled = selectedQuery.parameters?.every(
-      (param) => parameterValues[param.name]?.trim() !== ''
-    ) ?? true
+    // Validate that all REQUIRED parameters are filled
+    const missingRequired = selectedQuery.parameters?.filter(
+      (param) => param.required && (!parameterValues[param.name] || parameterValues[param.name].trim() === '')
+    ) ?? []
 
-    if (!allFilled) {
-      toast.error('Please fill in all parameters')
+    if (missingRequired.length > 0) {
+      const missingNames = missingRequired.map(p => p.name.replace(/_/g, ' ')).join(', ')
+      toast.error(`Please fill in required parameters: ${missingNames}`)
       return
     }
 
@@ -213,6 +215,7 @@ const PredefinedQueryDialog = ({
                   <div key={param.name} className="space-y-2">
                     <label className="text-sm font-medium text-primary">
                       {param.name.replace(/_/g, ' ')}
+                      {param.required && <span className="ml-1 text-red-500">*</span>}
                       <span className="ml-1 text-xs text-secondary">({param.type})</span>
                     </label>
                     {renderParameterInput(param)}
@@ -244,7 +247,9 @@ const PredefinedQueryDialog = ({
                     </div>
                     {query.parameters && query.parameters.length > 0 && (
                       <div className="mt-2 text-xs text-secondary">
-                        Parameters: {query.parameters.map((p) => p.name).join(', ')}
+                        Parameters: {query.parameters.map((p) => 
+                          `${p.name}${p.required ? '*' : ''}`
+                        ).join(', ')}
                       </div>
                     )}
                   </button>

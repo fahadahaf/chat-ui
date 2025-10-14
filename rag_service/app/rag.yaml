@@ -8,8 +8,9 @@
     Returns: All agents in the hierarchy tree with their roles and relationships.
   file: /queries/agent_hierarchy.gremlin
   parameters:
-    - name: agent_id
+    agent_id:
       type: string
+      required: true
 - name: count agents in team
   description: Count number of agents in a team by team_id
   details: |
@@ -19,8 +20,9 @@
     Returns: Integer count of all active agents in the team.
   file: /queries/count_agents_in_team.gremlin
   parameters:
-    - name: team_id
+    team_id:
       type: string
+      required: true
 - name: agent details
   description: Get details of a given agent id
   details: |
@@ -30,8 +32,9 @@
     Returns: Agent profile with all metadata fields.
   file: /queries/agent_details.gremlin
   parameters:
-    - name: agent_id
+    agent_id:
       type: string
+      required: true
 - name: list all teams
   description: List all teams in the system
   details: |
@@ -49,10 +52,12 @@
     Returns: All agents connected within 2 hops with connection types.
   file: /queries/agent_connections.gremlin
   parameters:
-    - name: agent_id
+    agent_id:
       type: string
-    - name: depth
+      required: true
+    depth:
       type: number
+      required: true
 - name: products sold by line of business
   description: Get all products sold by a given line of business for a given period
   details: |
@@ -66,13 +71,16 @@
     Returns: List of products with sales figures, revenue, and units sold.
   file: /queries/products_by_lob.gremlin
   parameters: 
-    - name: line_of_business
+    line_of_business:
       type: select
       options:
         - COSMETICS
         - CLOTHING
         - SPORTS
-    - name: period_start
+      required: true
+    period_start:
       type: date
-    - name: period_end
+      required: true
+    period_end:
       type: date
+      required: true

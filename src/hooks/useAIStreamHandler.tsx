@@ -235,49 +235,82 @@ const useAIChatStreamHandler = () => {
             throw new Error(`RAG backend error: ${res.statusText}`)
           }
           const data = (await res.json()) as { plan?: unknown; raw?: string; table?: { title?: string; columns: string[]; rows: Array<Record<string, unknown>> } }
-          // Prefer backend-provided table; fallback to building from plan
-          let columns = ['step', 'name', 'parameters']
-          let rows: Array<Record<string, unknown>> = []
-          if (data.table && Array.isArray(data.table.columns) && Array.isArray(data.table.rows)) {
-            columns = data.table.columns
-            rows = data.table.rows.map((r) => ({ ...r, parameters: r.parameters ? JSON.stringify(r.parameters) : r.parameters }))
-          } else {
-            const plan = Array.isArray(data.plan) ? data.plan : []
-            for (const step of plan as any[]) {
-              rows.push({
-                step: (step && step.step) ?? '',
-                name: (step && step.name) ?? '',
-                parameters: (step && step.parameters) ? JSON.stringify(step.parameters) : ''
-              })
-            }
-          }
-          setMessages((prev) => {
-            const newMessages = [...prev]
-            const lastMessage = newMessages[newMessages.length - 1]
-            if (lastMessage && lastMessage.role === 'agent') {
-              lastMessage.content = ''
-              lastMessage.extra_data = {
-                ...lastMessage.extra_data,
-                table: {
-                  title: (data as any)?.table?.title || 'Execution Plan',
-                  columns,
-                  rows
+          
+          // Check if this is a missing parameters error or validation error
+          const plan = Array.isArray(data.plan) ? data.plan : []
+          const hasMissingParams = plan.length > 0 && (plan[0] as any)?.name === 'missing_parameters'
+          const hasValidationError = plan.length > 0 && (plan[0] as any)?.name === 'validation_error'
+          
+          if (hasMissingParams || hasValidationError) {
+            // Display error message as content
+            const errorMessage = (plan[0] as any)?.message || 'Parameter validation failed'
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              const lastMessage = newMessages[newMessages.length - 1]
+              if (lastMessage && lastMessage.role === 'agent') {
+                lastMessage.content = errorMessage
+                lastMessage.extra_data = {
+                  ...lastMessage.extra_data
                 }
               }
+              return newMessages
+            })
+            
+            // Persist error message
+            if (newSessionId) {
+              try {
+                await fetch(`/api/chats/${newSessionId}/messages`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ role: 'agent', content: errorMessage })
+                })
+              } catch {}
             }
-            return newMessages
-          })
-
-          // Persist agent response with table
-          if (newSessionId) {
-            try {
-              await fetch(`/api/chats/${newSessionId}/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ role: 'agent', content: '', extra_data: { table: { title: (data as any)?.table?.title || 'Execution Plan', columns, rows } } })
-              })
-            } catch {}
+          } else {
+            // Normal plan execution - show table
+            let columns = ['step', 'name', 'parameters']
+            let rows: Array<Record<string, unknown>> = []
+            if (data.table && Array.isArray(data.table.columns) && Array.isArray(data.table.rows)) {
+              columns = data.table.columns
+              rows = data.table.rows.map((r) => ({ ...r, parameters: r.parameters ? JSON.stringify(r.parameters) : r.parameters }))
+            } else {
+              for (const step of plan as any[]) {
+                rows.push({
+                  step: (step && step.step) ?? '',
+                  name: (step && step.name) ?? '',
+                  parameters: (step && step.parameters) ? JSON.stringify(step.parameters) : ''
+                })
+              }
+            }
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              const lastMessage = newMessages[newMessages.length - 1]
+              if (lastMessage && lastMessage.role === 'agent') {
+                lastMessage.content = ''
+                lastMessage.extra_data = {
+                  ...lastMessage.extra_data,
+                  table: {
+                    title: (data as any)?.table?.title || 'Execution Plan',
+                    columns,
+                    rows
+                  }
+                }
+              }
+              return newMessages
+            })
+            
+            // Persist agent response with table
+            if (newSessionId) {
+              try {
+                await fetch(`/api/chats/${newSessionId}/messages`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ role: 'agent', content: '', extra_data: { table: { title: (data as any)?.table?.title || 'Execution Plan', columns, rows } } })
+                })
+              } catch {}
+            }
           }
         } else {
           const endpointUrl = constructEndpointUrl(selectedEndpoint)
