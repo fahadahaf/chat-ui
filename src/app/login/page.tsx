@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -60,7 +61,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col">
+      <div className="fixed right-4 top-4 z-50">
+        <ThemeToggle />
+      </div>
       {/* Main content area */}
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-8">
@@ -123,9 +127,9 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex h-10 items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-black transition-colors hover:bg-primary/90 disabled:opacity-50"
+              className="flex h-10 items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-background transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />}
+              {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />}
               {loading ? 'Logging in…' : 'Login'}
             </button>
             <p className="text-center text-xs text-muted-foreground">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -32,7 +33,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="relative flex min-h-screen items-center justify-center">
+      <div className="fixed right-4 top-4 z-50">
+        <ThemeToggle />
+      </div>
       <form onSubmit={onSubmit} className="flex w-full max-w-xs flex-col gap-2 rounded-md border border-primary/15 p-4">
         <h1 className="text-sm font-medium uppercase">Register</h1>
         {error && <p className="text-xs text-destructive">{error}</p>}

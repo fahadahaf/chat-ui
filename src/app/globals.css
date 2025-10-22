@@ -4,12 +4,39 @@
 
 @layer base {
   :root {
-    --color-border-default: 255, 255, 255, 0.2;
     --scrollbar-width: 0.1rem;
+    
+    /* Light theme colors */
+    --color-primary: 23 23 23; /* #171717 - dark text */
+    --color-primary-accent: 245 245 245; /* #F5F5F5 - light accent */
+    --color-brand: 255 64 23; /* #FF4017 - orange brand */
+    --color-background: 255 255 255; /* #FFFFFF - white background */
+    --color-background-secondary: 250 250 250; /* #FAFAFA - light secondary */
+    --color-secondary: 82 82 91; /* #52525B - medium gray text */
+    --color-border-default: 228 228 231; /* #E4E4E7 - light border */
+    --color-accent: 244 244 245; /* #F4F4F5 - light accent */
+    --color-muted: 161 161 170; /* #A1A1AA - muted text */
+    --color-destructive: 239 68 68; /* #EF4444 - red */
+    --color-positive: 34 197 94; /* #22C55E - green */
+  }
+
+  .dark {
+    /* Dark theme colors */
+    --color-primary: 250 250 250; /* #FAFAFA - light text */
+    --color-primary-accent: 24 24 27; /* #18181B - dark accent */
+    --color-brand: 255 64 23; /* #FF4017 - orange brand (same) */
+    --color-background: 17 17 19; /* #111113 - dark background */
+    --color-background-secondary: 39 39 42; /* #27272A - dark secondary */
+    --color-secondary: 245 245 245; /* #F5F5F5 - light text */
+    --color-border-default: 63 63 70; /* #3F3F46 - dark border */
+    --color-accent: 39 39 42; /* #27272A - dark accent */
+    --color-muted: 161 161 170; /* #A1A1AA - muted text (same) */
+    --color-destructive: 229 57 53; /* #E53935 - red */
+    --color-positive: 34 197 94; /* #22C55E - green (same) */
   }
 
   body {
-    @apply bg-background/80 text-secondary;
+    @apply bg-background text-secondary transition-colors duration-200;
   }
 }
 
