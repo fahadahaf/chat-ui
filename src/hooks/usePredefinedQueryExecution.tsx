@@ -41,6 +41,11 @@ const usePredefinedQueryExecution = () => {
         created_at: Math.floor(Date.now() / 1000) + 1
       })
 
+      // Capture messages immediately after adding them, before any async operations
+      // This ensures we have the correct messages for THIS session, not messages from 
+      // another session if the user switches during execution
+      const messagesForThisSession = [...useStore.getState().messages]
+
       let newSessionId = sessionId
       try {
         if (backend === 'ollama' || backend === 'amazon') {
@@ -81,17 +86,16 @@ const usePredefinedQueryExecution = () => {
             } else {
               setOllamaSessions((prev) => prev.map((s) => s.session_id === newSessionId && (s.session_name === 'New Chat' || !s.session_name) ? { ...s, session_name: title } : s))
             }
-            // Update session messages with current messages
-            const currentMessages = useStore.getState().messages
+            // Store the messages we captured at the start (not current messages which might be from another session)
             if (backend === 'ollama') {
               setOllamaSessionMessages((prev) => ({
                 ...prev,
-                [newSessionId as string]: currentMessages
+                [newSessionId as string]: messagesForThisSession
               }))
             } else {
               setAmazonSessionMessages((prev) => ({
                 ...prev,
-                [newSessionId as string]: currentMessages
+                [newSessionId as string]: messagesForThisSession
               }))
             }
           }
