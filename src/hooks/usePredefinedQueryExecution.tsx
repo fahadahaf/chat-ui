@@ -180,9 +180,15 @@ const usePredefinedQueryExecution = () => {
             }
           }
           
-          // Also update current messages if still on the same session
-          const currentSessionId = useStore.getState().messages[0]?.created_at ? sessionId : executionSessionId
-          if (currentSessionId === newSessionId) {
+          // Only update currently visible messages if user is still viewing the session where query was executed
+          // Get the current session ID from the URL at the time results arrive (not from closure)
+          const getCurrentSessionId = () => {
+            const params = new URLSearchParams(window.location.search)
+            return params.get('session')
+          }
+          const currentlyViewingSessionId = getCurrentSessionId()
+          
+          if (currentlyViewingSessionId === newSessionId) {
             setMessages(updateMessagesForSession)
           }
 
