@@ -245,13 +245,6 @@ const PredefinedQueryDialog = ({
                     <div className="mt-1 text-xs text-secondary">
                       {query.description}
                     </div>
-                    {query.parameters && query.parameters.length > 0 && (
-                      <div className="mt-2 text-xs text-secondary">
-                        Parameters: {query.parameters.map((p) => 
-                          `${p.name}${p.required ? '*' : ''}`
-                        ).join(', ')}
-                      </div>
-                    )}
                   </button>
                 ))
               )}
