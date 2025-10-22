@@ -16,6 +16,7 @@ import { cn, truncateText } from '@/lib/utils'
 
 const OllamaQueries = () => {
   const setMessages = useStore((s) => s.setMessages)
+  const ollamaSessionMessages = useStore((s) => s.ollamaSessionMessages)
   const [currentSessionId, setSessionId] = useQueryState('session')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -52,6 +53,14 @@ const OllamaQueries = () => {
 
   const handleSelect = async (id: string) => {
     setSessionId(id)
+    
+    // Check if we have messages in memory first (e.g., from a running query)
+    if (ollamaSessionMessages[id] && ollamaSessionMessages[id].length > 0) {
+      setMessages(ollamaSessionMessages[id])
+      return
+    }
+    
+    // Otherwise load from API
     try {
       const res = await fetch(`/api/chats/${id}/messages`, { cache: 'no-store' })
       if (!res.ok) throw new Error()

@@ -19,9 +19,14 @@ const ChatInput = () => {
   const { executePredefinedQuery } = usePredefinedQueryExecution()
   const [selectedAgent] = useQueryState('agent')
   const [teamId] = useQueryState('team')
+  const [sessionId] = useQueryState('session')
   const [inputMessage, setInputMessage] = useState('')
   const isStreaming = useStore((state) => state.isStreaming)
+  const streamingSessionIds = useStore((state) => state.streamingSessionIds)
   const [isQueryDialogOpen, setIsQueryDialogOpen] = useState(false)
+  
+  // Check if the current session is streaming
+  const isCurrentSessionStreaming = sessionId ? streamingSessionIds.has(sessionId) : false
 
   const handleSubmit = async () => {
     if (!inputMessage.trim()) return
@@ -58,7 +63,7 @@ const ChatInput = () => {
         {(backend === 'ollama' || backend === 'amazon') && (
           <Button
             onClick={() => setIsQueryDialogOpen(true)}
-            disabled={isStreaming}
+            disabled={isCurrentSessionStreaming}
             size="icon"
             className="rounded-xl bg-primary p-5 text-primaryAccent"
             title="Predefined Queries"
@@ -75,7 +80,7 @@ const ChatInput = () => {
               e.key === 'Enter' &&
               !e.nativeEvent.isComposing &&
               !e.shiftKey &&
-              !isStreaming
+              !isCurrentSessionStreaming
             ) {
               e.preventDefault()
               handleSubmit()
@@ -90,7 +95,7 @@ const ChatInput = () => {
           disabled={
             (backend === 'ollama' ? !ollamaModel : false) || 
             !inputMessage.trim() || 
-            isStreaming
+            isCurrentSessionStreaming
           }
           size="icon"
           className="rounded-xl bg-primary p-5 text-primaryAccent"

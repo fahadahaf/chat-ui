@@ -9,14 +9,20 @@ const usePredefinedQueryExecution = () => {
   const backend = useStore((state) => state.backend)
   const ragUrl = useStore((state) => state.ragUrl)
   const setIsStreaming = useStore((state) => state.setIsStreaming)
+  const addStreamingSession = useStore((state) => state.addStreamingSession)
+  const removeStreamingSession = useStore((state) => state.removeStreamingSession)
   const [sessionId, setSessionId] = useQueryState('session')
   const setOllamaSessions = useStore((s) => s.setOllamaSessions)
   const setOllamaSessionMessages = useStore((s) => s.setOllamaSessionMessages)
+  const setAmazonSessionMessages = useStore((s) => s.setAmazonSessionMessages)
   const ollamaSessions = useStore((s) => s.ollamaSessions)
 
   const executePredefinedQuery = useCallback(
     async (queryName: string, parameters: Record<string, string>) => {
       setIsStreaming(true)
+      
+      // Capture the session ID at the start of execution
+      const executionSessionId = sessionId
 
       // Create a user message describing the query
       const userMessage = `[Predefined Query] ${queryName}: ${JSON.stringify(parameters)}`
@@ -34,31 +40,6 @@ const usePredefinedQueryExecution = () => {
         streamingError: false,
         created_at: Math.floor(Date.now() / 1000) + 1
       })
-
-      // Ensure an Ollama session exists and has a name
-      let effectiveSessionId = sessionId ?? ''
-      if (backend === 'ollama' || backend === 'amazon') {
-        if (!effectiveSessionId) {
-          effectiveSessionId = `${Date.now()}`
-          setSessionId(effectiveSessionId)
-        }
-        const title = `${queryName}`.slice(0, 40) || 'New Query'
-        const exists = ollamaSessions.some((s) => s.session_id === effectiveSessionId)
-        if (!exists) {
-          setOllamaSessions((prev) => [
-            { session_id: effectiveSessionId, session_name: title, created_at: Math.floor(Date.now() / 1000) },
-            ...prev,
-          ])
-        } else {
-          setOllamaSessions((prev) => prev.map((s) => s.session_id === effectiveSessionId && (s.session_name === 'New Chat' || !s.session_name) ? { ...s, session_name: title } : s))
-        }
-        // Initialize session messages immediately
-        const currentMessages = useStore.getState().messages
-        setOllamaSessionMessages((prev) => ({
-          ...prev,
-          [effectiveSessionId]: currentMessages
-        }))
-      }
 
       let newSessionId = sessionId
       try {
@@ -81,6 +62,38 @@ const usePredefinedQueryExecution = () => {
                 } catch {}
               }
             } catch {}
+          }
+          
+          // Mark this session as streaming
+          if (newSessionId) {
+            addStreamingSession(newSessionId)
+          }
+          
+          // Ensure session exists in local storage and update title
+          if (backend === 'ollama' || backend === 'amazon') {
+            const title = `${queryName}`.slice(0, 40) || 'New Query'
+            const exists = ollamaSessions.some((s) => s.session_id === newSessionId)
+            if (!exists) {
+              setOllamaSessions((prev) => [
+                { session_id: newSessionId as string, session_name: title, created_at: Math.floor(Date.now() / 1000) },
+                ...prev,
+              ])
+            } else {
+              setOllamaSessions((prev) => prev.map((s) => s.session_id === newSessionId && (s.session_name === 'New Chat' || !s.session_name) ? { ...s, session_name: title } : s))
+            }
+            // Update session messages with current messages
+            const currentMessages = useStore.getState().messages
+            if (backend === 'ollama') {
+              setOllamaSessionMessages((prev) => ({
+                ...prev,
+                [newSessionId as string]: currentMessages
+              }))
+            } else {
+              setAmazonSessionMessages((prev) => ({
+                ...prev,
+                [newSessionId as string]: currentMessages
+              }))
+            }
           }
 
           // Persist user message
@@ -134,8 +147,9 @@ const usePredefinedQueryExecution = () => {
             })
           }
 
-          setMessages((prev) => {
-            const newMessages = [...prev]
+          // Update messages for the session where query was executed
+          const updateMessagesForSession = (messages: any[]) => {
+            const newMessages = [...messages]
             const lastMessage = newMessages[newMessages.length - 1]
             if (lastMessage && lastMessage.role === 'agent') {
               lastMessage.content = ''
@@ -149,7 +163,28 @@ const usePredefinedQueryExecution = () => {
               }
             }
             return newMessages
-          })
+          }
+
+          // Update the session messages in storage
+          if (newSessionId) {
+            if (backend === 'ollama') {
+              setOllamaSessionMessages((prev) => ({
+                ...prev,
+                [newSessionId as string]: updateMessagesForSession(prev[newSessionId as string] || [])
+              }))
+            } else if (backend === 'amazon') {
+              setAmazonSessionMessages((prev) => ({
+                ...prev,
+                [newSessionId as string]: updateMessagesForSession(prev[newSessionId as string] || [])
+              }))
+            }
+          }
+          
+          // Also update current messages if still on the same session
+          const currentSessionId = useStore.getState().messages[0]?.created_at ? sessionId : executionSessionId
+          if (currentSessionId === newSessionId) {
+            setMessages(updateMessagesForSession)
+          }
 
           // Persist agent response with table
           if (newSessionId) {
@@ -174,6 +209,10 @@ const usePredefinedQueryExecution = () => {
           return newMessages
         })
       } finally {
+        // Remove this session from streaming
+        if (newSessionId) {
+          removeStreamingSession(newSessionId)
+        }
         focusChatInput()
         setIsStreaming(false)
       }
@@ -184,12 +223,15 @@ const usePredefinedQueryExecution = () => {
       backend,
       ragUrl,
       setIsStreaming,
+      addStreamingSession,
+      removeStreamingSession,
       focusChatInput,
       sessionId,
       setSessionId,
       ollamaSessions,
       setOllamaSessions,
-      setOllamaSessionMessages
+      setOllamaSessionMessages,
+      setAmazonSessionMessages
     ]
   )
 

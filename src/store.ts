@@ -28,6 +28,10 @@ interface Store {
   ) => void
   isStreaming: boolean
   setIsStreaming: (isStreaming: boolean) => void
+  // Track which sessions are currently streaming
+  streamingSessionIds: Set<string>
+  addStreamingSession: (sessionId: string) => void
+  removeStreamingSession: (sessionId: string) => void
   isEndpointActive: boolean
   setIsEndpointActive: (isActive: boolean) => void
   isEndpointLoading: boolean
@@ -115,6 +119,19 @@ export const useStore = create<Store>()(
       setEndpoints: (endpoints) => set(() => ({ endpoints })),
       isStreaming: false,
       setIsStreaming: (isStreaming) => set(() => ({ isStreaming })),
+      streamingSessionIds: new Set<string>(),
+      addStreamingSession: (sessionId) => 
+        set((state) => {
+          const newSet = new Set(state.streamingSessionIds)
+          newSet.add(sessionId)
+          return { streamingSessionIds: newSet }
+        }),
+      removeStreamingSession: (sessionId) => 
+        set((state) => {
+          const newSet = new Set(state.streamingSessionIds)
+          newSet.delete(sessionId)
+          return { streamingSessionIds: newSet }
+        }),
       isEndpointActive: false,
       setIsEndpointActive: (isActive) =>
         set(() => ({ isEndpointActive: isActive })),

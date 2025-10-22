@@ -27,6 +27,8 @@ const useAIChatStreamHandler = () => {
     (state) => state.setStreamingErrorMessage
   )
   const setIsStreaming = useStore((state) => state.setIsStreaming)
+  const addStreamingSession = useStore((state) => state.addStreamingSession)
+  const removeStreamingSession = useStore((state) => state.removeStreamingSession)
   const setSessionsData = useStore((state) => state.setSessionsData)
   const { streamResponse } = useAIResponseStream()
   const ollamaSessions = useStore((s) => s.ollamaSessions)
@@ -193,6 +195,11 @@ const useAIChatStreamHandler = () => {
                 } catch {}
               }
             } catch {}
+          }
+          
+          // Mark this session as streaming
+          if (newSessionId) {
+            addStreamingSession(newSessionId)
           }
 
           // Persist user message
@@ -590,6 +597,10 @@ const useAIChatStreamHandler = () => {
           )
         }
       } finally {
+        // Remove this session from streaming
+        if (newSessionId) {
+          removeStreamingSession(newSessionId)
+        }
         focusChatInput()
         setIsStreaming(false)
       }
@@ -609,6 +620,8 @@ const useAIChatStreamHandler = () => {
       mode,
       setStreamingErrorMessage,
       setIsStreaming,
+      addStreamingSession,
+      removeStreamingSession,
       focusChatInput,
       setSessionsData,
       sessionId,

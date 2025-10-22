@@ -16,6 +16,7 @@ import { cn, truncateText } from '@/lib/utils'
 
 const AmazonQueries = () => {
   const setMessages = useStore((s) => s.setMessages)
+  const amazonSessionMessages = useStore((s) => s.amazonSessionMessages)
   const [currentSessionId, setSessionId] = useQueryState('session')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -51,6 +52,14 @@ const AmazonQueries = () => {
 
   const handleSelect = async (id: string) => {
     setSessionId(id)
+    
+    // Check if we have messages in memory first (e.g., from a running query)
+    if (amazonSessionMessages[id] && amazonSessionMessages[id].length > 0) {
+      setMessages(amazonSessionMessages[id])
+      return
+    }
+    
+    // Otherwise load from API
     try {
       const res = await fetch(`/api/chats/${id}/messages`, { cache: 'no-store' })
       if (!res.ok) throw new Error()
