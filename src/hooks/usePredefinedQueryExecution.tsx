@@ -172,28 +172,45 @@ const usePredefinedQueryExecution = () => {
           // Update the session messages in storage
           if (newSessionId) {
             if (backend === 'ollama') {
-              setOllamaSessionMessages((prev) => ({
-                ...prev,
-                [newSessionId as string]: updateMessagesForSession(prev[newSessionId as string] || [])
-              }))
+              setOllamaSessionMessages((prev) => {
+                const messagesInStorage = prev[newSessionId as string] || []
+                return {
+                  ...prev,
+                  [newSessionId as string]: updateMessagesForSession(messagesInStorage)
+                }
+              })
             } else if (backend === 'amazon') {
-              setAmazonSessionMessages((prev) => ({
-                ...prev,
-                [newSessionId as string]: updateMessagesForSession(prev[newSessionId as string] || [])
-              }))
+              setAmazonSessionMessages((prev) => {
+                const messagesInStorage = prev[newSessionId as string] || []
+                return {
+                  ...prev,
+                  [newSessionId as string]: updateMessagesForSession(messagesInStorage)
+                }
+              })
             }
           }
           
           // Only update currently visible messages if user is still viewing the session where query was executed
-          // Get the current session ID from the URL at the time results arrive (not from closure)
+          // We need to be very defensive here to avoid cross-session contamination
           const getCurrentSessionId = () => {
             const params = new URLSearchParams(window.location.search)
             return params.get('session')
           }
           const currentlyViewingSessionId = getCurrentSessionId()
           
-          if (currentlyViewingSessionId === newSessionId) {
-            setMessages(updateMessagesForSession)
+          // Only update if BOTH conditions are true:
+          // 1. User is viewing the session where query ran
+          // 2. The visible messages belong to this session (double-check)
+          if (currentlyViewingSessionId === newSessionId && newSessionId) {
+            // Get the updated messages from storage (not from visible messages)
+            const storage = backend === 'ollama' 
+              ? useStore.getState().ollamaSessionMessages 
+              : useStore.getState().amazonSessionMessages
+            const updatedMessages = storage[newSessionId as string]
+            
+            if (updatedMessages && updatedMessages.length > 0) {
+              setMessages(updatedMessages)
+            }
           }
 
           // Persist agent response with table
