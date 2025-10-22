@@ -17,6 +17,8 @@ import { cn, truncateText } from '@/lib/utils'
 const AmazonQueries = () => {
   const setMessages = useStore((s) => s.setMessages)
   const amazonSessionMessages = useStore((s) => s.amazonSessionMessages)
+  const setAmazonSessionMessages = useStore((s) => s.setAmazonSessionMessages)
+  const streamingSessionIds = useStore((s) => s.streamingSessionIds)
   const [currentSessionId, setSessionId] = useQueryState('session')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -53,14 +55,17 @@ const AmazonQueries = () => {
   const handleSelect = async (id: string) => {
     setSessionId(id)
     
-    // Check if we have messages in memory first (e.g., from a running query)
-    // Deep copy to avoid reference issues
-    if (amazonSessionMessages[id] && amazonSessionMessages[id].length > 0) {
+    // Check if this session is currently streaming (query running)
+    const isThisSessionStreaming = streamingSessionIds.has(id)
+    
+    // If streaming, prefer in-memory messages which have the loading state
+    if (isThisSessionStreaming && amazonSessionMessages[id]) {
       setMessages(amazonSessionMessages[id].map(msg => ({ ...msg })))
       return
     }
     
-    // Otherwise load from API
+    // ALWAYS load from API to ensure we get the latest results
+    // This prevents cross-session contamination from in-memory state
     try {
       const res = await fetch(`/api/chats/${id}/messages`, { cache: 'no-store' })
       if (!res.ok) throw new Error()
@@ -70,16 +75,26 @@ const AmazonQueries = () => {
         extra_data?: unknown
         created_at: number
       }>
-      setMessages(
-        msgs.map((m) => ({
-          role: m.role,
-          content: m.content,
-          created_at: m.created_at,
-          ...(m.extra_data ? { extra_data: m.extra_data } : {})
-        }))
-      )
+      const loadedMessages = msgs.map((m) => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+        ...(m.extra_data ? { extra_data: m.extra_data } : {})
+      }))
+      setMessages(loadedMessages)
+      
+      // Also update in-memory storage with fresh data from API
+      setAmazonSessionMessages((prev) => ({
+        ...prev,
+        [id]: loadedMessages
+      }))
     } catch {
-      setMessages([])
+      // Fallback to in-memory if API fails
+      if (amazonSessionMessages[id] && amazonSessionMessages[id].length > 0) {
+        setMessages(amazonSessionMessages[id].map(msg => ({ ...msg })))
+      } else {
+        setMessages([])
+      }
     }
   }
 

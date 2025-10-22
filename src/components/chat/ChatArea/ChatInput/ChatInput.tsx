@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { TextArea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -20,13 +20,38 @@ const ChatInput = () => {
   const [selectedAgent] = useQueryState('agent')
   const [teamId] = useQueryState('team')
   const [sessionId] = useQueryState('session')
-  const [inputMessage, setInputMessage] = useState('')
+  const sessionInputs = useStore((state) => state.sessionInputs)
+  const setSessionInput = useStore((state) => state.setSessionInput)
   const isStreaming = useStore((state) => state.isStreaming)
   const streamingSessionIds = useStore((state) => state.streamingSessionIds)
   const [isQueryDialogOpen, setIsQueryDialogOpen] = useState(false)
   
+  // Local state for when there's no session yet (first time / no chats)
+  const [localInputMessage, setLocalInputMessage] = useState('')
+  
   // Check if the current session is streaming
   const isCurrentSessionStreaming = sessionId ? streamingSessionIds.has(sessionId) : false
+  
+  // Get current session's input text (use local state if no session exists)
+  const inputMessage = sessionId ? (sessionInputs[sessionId] || '') : localInputMessage
+  
+  // Update session-specific input text (use local state if no session exists)
+  const setInputMessage = (text: string) => {
+    if (sessionId) {
+      setSessionInput(sessionId, text)
+    } else {
+      // No session yet, use local state
+      setLocalInputMessage(text)
+    }
+  }
+  
+  // When session is created, transfer local input to session storage and clear local
+  useEffect(() => {
+    if (sessionId && localInputMessage) {
+      setSessionInput(sessionId, localInputMessage)
+      setLocalInputMessage('')
+    }
+  }, [sessionId, localInputMessage, setSessionInput])
 
   const handleSubmit = async () => {
     if (!inputMessage.trim()) return

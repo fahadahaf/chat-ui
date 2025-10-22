@@ -581,7 +581,20 @@ const useAIChatStreamHandler = () => {
                 )
               }
             },
-            onComplete: () => {}
+            onComplete: () => {
+              // Force refresh the currently viewed session to show final results
+              const currentViewingSession = new URLSearchParams(window.location.search).get('session')
+              
+              if (currentViewingSession === newSessionId && newSessionId) {
+                // User is viewing the session where streaming just completed - ensure it's refreshed
+                const storage = useStore.getState().ollamaSessionMessages
+                const updatedMessages = storage[newSessionId]
+                
+                if (updatedMessages && updatedMessages.length > 0) {
+                  setMessages(updatedMessages.map(msg => ({ ...msg })))
+                }
+              }
+            }
           })
         }
       } catch (error) {

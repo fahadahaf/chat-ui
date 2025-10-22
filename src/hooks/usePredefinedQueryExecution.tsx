@@ -204,21 +204,24 @@ const usePredefinedQueryExecution = () => {
           }
           const currentlyViewingSessionId = getCurrentSessionId()
           
-          // Only update if BOTH conditions are true:
-          // 1. User is viewing the session where query ran
-          // 2. The visible messages belong to this session (double-check)
-          if (currentlyViewingSessionId === newSessionId && newSessionId) {
-            // Get the updated messages from storage (not from visible messages)
+          // Force refresh the currently viewed session to show updated results
+          // Check what session the user is currently viewing
+          const currentViewingSession = new URLSearchParams(window.location.search).get('session')
+          
+          if (currentViewingSession === newSessionId && newSessionId) {
+            // User is viewing the session where query just completed - refresh it!
             const storage = backend === 'ollama' 
               ? useStore.getState().ollamaSessionMessages 
               : useStore.getState().amazonSessionMessages
             const updatedMessages = storage[newSessionId as string]
             
-            // Deep copy to avoid reference issues
             if (updatedMessages && updatedMessages.length > 0) {
+              // Force refresh visible messages with completed results
               setMessages(updatedMessages.map(msg => ({ ...msg })))
             }
           }
+          
+          // If user is viewing a different session, results will load when they switch back
 
           // Persist agent response with table
           if (newSessionId) {

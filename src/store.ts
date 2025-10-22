@@ -103,6 +103,9 @@ interface Store {
       | Record<string, ChatMessage[]>
       | ((prev: Record<string, ChatMessage[]>) => Record<string, ChatMessage[]>)
   ) => void
+  // Session-specific input text storage
+  sessionInputs: Record<string, string>
+  setSessionInput: (sessionId: string, text: string) => void
 }
 
 export const useStore = create<Store>()(
@@ -212,6 +215,15 @@ export const useStore = create<Store>()(
                   state.amazonSessionMessages
                 )
               : updater
+        })),
+      // Session-specific input text storage
+      sessionInputs: {},
+      setSessionInput: (sessionId, text) =>
+        set((state) => ({
+          sessionInputs: {
+            ...state.sessionInputs,
+            [sessionId]: text
+          }
         }))
     }),
     {
