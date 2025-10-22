@@ -500,14 +500,14 @@ const Sidebar = () => {
 
   return (
     <motion.aside
-      className="relative flex h-screen shrink-0 grow-0 flex-col overflow-hidden px-2 py-3 font-dmmono"
+      className="relative flex h-screen shrink-0 grow-0 flex-col overflow-hidden bg-sidebar px-2 py-3 font-dmmono transition-colors duration-200"
       initial={{ width: '16rem' }}
       animate={{ width: isCollapsed ? '2.5rem' : '16rem' }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
       <motion.button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute right-2 top-2 z-10 p-1"
+        className="absolute right-2 top-2 z-10 p-1 text-primary"
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         type="button"
         whileTap={{ scale: 0.95 }}

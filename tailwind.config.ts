@@ -18,6 +18,7 @@ export default {
           DEFAULT: 'rgb(var(--color-background) / <alpha-value>)',
           secondary: 'rgb(var(--color-background-secondary) / <alpha-value>)'
         },
+        sidebar: 'rgb(var(--color-sidebar) / <alpha-value>)',
         secondary: 'rgb(var(--color-secondary) / <alpha-value>)',
         border: 'rgb(var(--color-border-default) / <alpha-value>)',
         accent: 'rgb(var(--color-accent) / <alpha-value>)',

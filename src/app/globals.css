@@ -12,6 +12,7 @@
     --color-brand: 255 64 23; /* #FF4017 - orange brand */
     --color-background: 255 255 255; /* #FFFFFF - white background */
     --color-background-secondary: 250 250 250; /* #FAFAFA - light secondary */
+    --color-sidebar: 249 250 251; /* #F9FAFB - slightly gray for sidebar */
     --color-secondary: 82 82 91; /* #52525B - medium gray text */
     --color-border-default: 228 228 231; /* #E4E4E7 - light border */
     --color-accent: 244 244 245; /* #F4F4F5 - light accent */
@@ -27,6 +28,7 @@
     --color-brand: 255 64 23; /* #FF4017 - orange brand (same) */
     --color-background: 17 17 19; /* #111113 - dark background */
     --color-background-secondary: 39 39 42; /* #27272A - dark secondary */
+    --color-sidebar: 24 24 27; /* #18181B - slightly lighter for sidebar */
     --color-secondary: 245 245 245; /* #F5F5F5 - light text */
     --color-border-default: 63 63 70; /* #3F3F46 - dark border */
     --color-accent: 39 39 42; /* #27272A - dark accent */
