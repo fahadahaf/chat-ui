@@ -152,21 +152,27 @@ const usePredefinedQueryExecution = () => {
           }
 
           // Update messages for the session where query was executed
+          // IMPORTANT: Deep copy to avoid mutating shared object references
           const updateMessagesForSession = (messages: any[]) => {
-            const newMessages = [...messages]
-            const lastMessage = newMessages[newMessages.length - 1]
-            if (lastMessage && lastMessage.role === 'agent') {
-              lastMessage.content = ''
-              lastMessage.extra_data = {
-                ...lastMessage.extra_data,
-                table: {
-                  title: data?.table?.title || 'Query Results',
-                  columns,
-                  rows
+            return messages.map((msg, index) => {
+              // Only update the last agent message
+              if (index === messages.length - 1 && msg.role === 'agent') {
+                return {
+                  ...msg,  // Create new object
+                  content: '',
+                  extra_data: {
+                    ...msg.extra_data,
+                    table: {
+                      title: data?.table?.title || 'Query Results',
+                      columns,
+                      rows
+                    }
+                  }
                 }
               }
-            }
-            return newMessages
+              // For all other messages, create new objects too
+              return { ...msg }
+            })
           }
 
           // Update the session messages in storage
@@ -208,8 +214,9 @@ const usePredefinedQueryExecution = () => {
               : useStore.getState().amazonSessionMessages
             const updatedMessages = storage[newSessionId as string]
             
+            // Deep copy to avoid reference issues
             if (updatedMessages && updatedMessages.length > 0) {
-              setMessages(updatedMessages)
+              setMessages(updatedMessages.map(msg => ({ ...msg })))
             }
           }
 

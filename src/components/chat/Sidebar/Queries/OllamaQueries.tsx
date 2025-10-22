@@ -55,8 +55,9 @@ const OllamaQueries = () => {
     setSessionId(id)
     
     // Check if we have messages in memory first (e.g., from a running query)
+    // Deep copy to avoid reference issues
     if (ollamaSessionMessages[id] && ollamaSessionMessages[id].length > 0) {
-      setMessages(ollamaSessionMessages[id])
+      setMessages(ollamaSessionMessages[id].map(msg => ({ ...msg })))
       return
     }
     

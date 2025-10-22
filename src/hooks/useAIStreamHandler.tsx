@@ -165,8 +165,8 @@ const useAIChatStreamHandler = () => {
         } else {
           setOllamaSessions((prev) => prev.map((s) => s.session_id === effectiveSessionId && (s.session_name === 'New Chat' || !s.session_name) ? { ...s, session_name: title } : s))
         }
-        // Initialize session messages immediately
-        const currentMessages = useStore.getState().messages
+        // Initialize session messages immediately (deep copy to avoid reference issues)
+        const currentMessages = useStore.getState().messages.map(msg => ({ ...msg }))
         setOllamaSessionMessages((prev) => ({
           ...prev,
           [effectiveSessionId]: currentMessages
@@ -562,7 +562,8 @@ const useAIChatStreamHandler = () => {
                       }
                     }
                   }
-                  return message
+                  // Create new objects for all messages to avoid reference issues
+                  return { ...message }
                 })
                 return newMessages
               })
